@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract SimpleRoulette {
+    address public owner;
+    uint256 public minimumBet;
+    uint256 public maxBet;
+
+    struct Bet {
+        address player;
+        uint256 betAmount;
+        uint256 number; // Bet on a number (0-36)
+    }
+
+    mapping(uint256 => Bet[]) public betsByNumber;
+
+    event BetPlaced(address indexed player, uint256 indexed number, uint256 amount);
+
+    constructor(uint256 _minimumBet, uint256 _maxBet) {
+        owner = msg.sender;
+        minimumBet = _minimumBet;
+        maxBet = _maxBet;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the contract owner can call this function.");
+        _;
+    }
+
+    function placeBet(uint256 _number) external payable {
+        require(_number >= 0 && _number <= 36, "Invalid bet number. Must be between 0 and 36.");
+        require(msg.value >= minimumBet && msg.value <= maxBet, "Bet amount must be within allowed limits.");
+
+        betsByNumber[_number].push(Bet({
+            player: msg.sender,
+            betAmount: msg.value,
+            number: _number
+        }));
+
+        emit BetPlaced(msg.sender, _number, msg.value);
+    }
+
+    function getWinningNumber() private view returns (uint256) {
+        // In a real application, you would implement a random number generation algorithm here.
+        // For simplicity, let's return a fixed number between 0 and 36.
+        return block.timestamp % 37;
+    }
+
+    function distributePrizes(uint256 winningNumber) external onlyOwner {
+        Bet[] storage winningBets = betsByNumber[winningNumber];
+        for (uint256 i = 0; i < winningBets.length; i++) {
+            uint256 payout = winningBets[i].betAmount * 36; // Payout is 36 times the bet amount for correct number bet
+            payable(winningBets[i].player).transfer(payout);
+        }
+        delete betsByNumber[winningNumber];
+    }
+
+    function withdrawFunds() external onlyOwner {
+        payable(owner).transfer(address(this).balance);
+    }
+}
